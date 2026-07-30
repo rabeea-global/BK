@@ -202,7 +202,7 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const dist=(x1,y1,x2,y2)=>Math.hypot(x1-x2,y1-y2);
 
 /* ============================================================================
-   نظام مفاجآت الأكل العراقي (آمن ضد كراش الصور والصوت)
+   نظام مفاجآت الأكل العراقي
    ========================================================================== */
 let audioGood = null, audioBad = null;
 try {
@@ -210,7 +210,6 @@ try {
   audioBad = new Audio('jo3an.mp3');
 } catch(e) {}
 
-// روابط محلية للصور لكي تتجنب الحظر من المتصفح
 const DISHES = [
   {n: 'تشريب لحم',     url: 'img/tashreeb_laham.jpg'},
   {n: 'تشريب باقلاء',  url: 'img/tashreeb_baqla.jpg'},
@@ -326,9 +325,6 @@ const NUKE_POOL=[
 ];
 let drawCount=0, lastPick={fam:'',idx:-1};
 
-/* ============================================================================
-   GEOMETRIC ANALYSIS
-   ========================================================================== */
 function perpDist(p,a,b){
   const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
   if(L<1e-6) return dist(p.x,p.y,a.x,a.y);
@@ -662,7 +658,7 @@ function resetGame(){
   buffs={rapid:0,power:0,multi:0,shield:0};BUFF_DMG=1;BUFF_COUNT=0;
   combo=0;killsSinceHit=0;dmgWindow=0;surprise=null;surpriseCD=4;
   player.x=W/2;player.y=H-140;player.hp=100;player.maxhp=100;
-  shipTX=player.x;shipTY=player.y;haveTarget=false;
+  shipTX=player.x;shipTY=player.y;haveTarget=false; isShooting=false;
   aimX=W/2;aimY=H*0.3;
   setText('score',0);updateHP();updateWChip();updateBK();
   startWave(1);
@@ -911,7 +907,8 @@ function update(dt){
   BUFF_COUNT = buffs.multi>0?2:0;
 
   fireCD-=dt;
-  if(fireCD<=0 && weapon){ fire(); fireCD=weapon.fireRate*(buffs.rapid>0?0.45:1); }
+  // الإطلاق الآن يتطلب ضغط الزر أو اللمس (isShooting = true)
+  if(isShooting && fireCD<=0 && weapon){ fire(); fireCD=weapon.fireRate*(buffs.rapid>0?0.45:1); }
 
   if(Math.random()<0.012){ const fromL=Math.random()<.5;
     meteors.push({x:fromL?-30:W+30, y:rand(0,H*0.5), vx:(fromL?1:-1)*rand(6,10), vy:rand(3,6), life:0, max:rand(1.1,1.8), r:rand(1.5,3)}); }
@@ -1056,19 +1053,17 @@ function render(){
       const a=clamp(playHintT/1.2,0,1);
       ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
       ctx.fillStyle='#eaf2ff';ctx.font='800 20px system-ui';
-      ctx.fillText('اسحب لتحريك السفينة 🚀 وتفادَ النيران', W/2, H*0.46);
+      ctx.fillText('حرك الفأرة (أو إصبعك) لتحريك السفينة 🚀', W/2, H*0.46);
       ctx.font='600 15px system-ui';ctx.fillStyle='#9fc6ff';
-      ctx.fillText('السلاح يطلق للأمام — صُفّ سفينتك أمام العدو', W/2, H*0.46+26);
+      ctx.fillText('اضغط باستمرار على زر الفأرة أو الشاشة للإطلاق', W/2, H*0.46+26);
       ctx.restore();
     }
     drawSurprise();
   } catch(err) {
-    // منع توقف اللعبة في حال وجود أخطاء في الرسم
     console.error("Render Error:", err);
   }
 }
 
-// رسم المفاجآت (نظام عرض الصور الحقيقية بشكل دائري وآمن تماماً)
 function drawSurprise(){
   const s = surprise; 
   if(!s) return;
@@ -1082,7 +1077,6 @@ function drawSurprise(){
   ctx.save();
   ctx.globalAlpha=a; ctx.translate(cx,cy);
   
-  // إشعاعات خلفية (Rays)
   ctx.save(); ctx.globalAlpha=a*(1-bb)*0.9;
   const rays=18;
   for(let i=0;i<rays;i++){
@@ -1092,7 +1086,6 @@ function drawSurprise(){
   }
   ctx.restore();
   
-  // حلقات الانفجار
   ctx.globalAlpha=a*(1-bb); ctx.strokeStyle=good?'#fff2c0':'#ffb0a0'; ctx.lineWidth=4;
   ctx.beginPath(); ctx.arc(0,0,18+bb*120,0,7); ctx.stroke();
   ctx.beginPath(); ctx.arc(0,0,10+bb*70,0,7); ctx.stroke();
@@ -1103,24 +1096,20 @@ function drawSurprise(){
   const sc = 0.5+bb*0.75;
   const img = imageCache[s.dish.n];
 
-  // رسم الصورة فقط إذا كانت مكتملة التنزيل ولم تفشل (الحماية من الكراش هنا)
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.save();
     ctx.globalAlpha = a * 0.96;
     ctx.scale(sc, sc);
 
-    // إنشاء قناع دائري
     ctx.beginPath();
     ctx.arc(0, 0, 65, 0, Math.PI * 2);
     ctx.closePath();
-    ctx.clip(); // تطبيق القناع
+    ctx.clip(); 
 
-    // رسم الصورة وتوسيطها (الحجم 130x130)
     ctx.drawImage(img, -65, -65, 130, 130);
     ctx.restore();
   }
 
-  // رسم إطار حول الطبق دائماً (حتى لو لم تكن هناك صورة)
   ctx.save();
   ctx.globalAlpha = a * 0.96;
   ctx.scale(sc, sc);
@@ -1129,13 +1118,11 @@ function drawSurprise(){
   ctx.lineWidth = 6;
   ctx.strokeStyle = good ? '#ffd23b' : '#ff6060';
   ctx.stroke();
-  // إضاءة داخلية للإطار
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#ffffff';
   ctx.stroke();
   ctx.restore();
   
-  // رسم الكلمات العراقية واسم الأكلة
   ctx.textAlign='center'; ctx.lineJoin='round';
   const word = good ? 'شماكل إنت' : 'إنت شنو جوعان';
   
@@ -1171,7 +1158,6 @@ function drawEnemyShot(b){
   ctx.restore();
 }
 
-/* HIGH-DETAIL PLAYER SHIP */
 function drawPlayer(){
   const p=player, S=p.r;
   if(enemies.length){
@@ -1442,14 +1428,60 @@ function loop(ts){
 requestAnimationFrame(loop);
 
 /* ============================================================================
-   TOUCH & INPUT HANDLING
+   التحكم الذكي (الماوس للكمبيوتر واللمس للهواتف)
    ========================================================================== */
 function localXY(e,canvas){
   const r=canvas.getBoundingClientRect();
   const t=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
   return {x:t.clientX-r.left, y:t.clientY-r.top};
 }
-function addDrag(canvas,start,move,end){
+
+let shipTX=0, shipTY=0, haveTarget=false, isShooting=false;
+function setShip(p){ shipTX=clamp(p.x,20,W-20); shipTY=clamp(p.y,60,H-30); haveTarget=true; }
+
+// --- أحداث الكمبيوتر (الماوس) ---
+// 1. الحركة تتبع الفأرة تلقائياً بدون ضغط
+cv.addEventListener('mousemove', e => {
+  if(state!=='play') return;
+  setShip(localXY(e, cv));
+});
+// 2. إطلاق النار فقط عند الضغط على زر الفأرة
+cv.addEventListener('mousedown', e => {
+  if(state!=='play') return;
+  isShooting = true;
+  setShip(localXY(e, cv));
+});
+window.addEventListener('mouseup', () => { isShooting = false; });
+
+// --- أحداث الهواتف (اللمس) ---
+// الحركة والإطلاق يكونان معاً بمجرد وضع الإصبع على الشاشة
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if(state!=='play') return;
+  isShooting = true;
+  setShip(localXY(e, cv));
+}, {passive: false});
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if(state!=='play') return;
+  setShip(localXY(e, cv));
+}, {passive: false});
+cv.addEventListener('touchend', e => {
+  e.preventDefault();
+  isShooting = false;
+}, {passive: false});
+cv.addEventListener('touchcancel', e => {
+  isShooting = false;
+});
+
+/* ============================================================================
+   DRAWING CANVAS LOGIC (منطقة الرسم)
+   ========================================================================== */
+const dcv=$('draw'), dctx=dcv.getContext('2d');
+let strokes=[], cur=null, drawing=false, padW=0, padH=0;
+
+// نظام السحب الخاص بمنطقة الرسم (يبقى كما هو ليعمل برسم الخطوط عند الضغط)
+function addDragForPad(canvas,start,move,end){
   const touch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
   if(touch){
     canvas.addEventListener('touchstart',e=>{e.preventDefault();start(localXY(e,canvas));},{passive:false});
@@ -1464,19 +1496,6 @@ function addDrag(canvas,start,move,end){
   }
 }
 
-let flying=false, shipTX=0, shipTY=0, haveTarget=false;
-addDrag(cv,
-  p=>{ if(state!=='play')return; flying=true; setShip(p); },
-  p=>{ if(flying) setShip(p); },
-  ()=>{ flying=false; }
-);
-function setShip(p){ shipTX=clamp(p.x,20,W-20); shipTY=clamp(p.y,60,H-30); haveTarget=true; }
-
-/* ============================================================================
-   DRAWING CANVAS LOGIC
-   ========================================================================== */
-const dcv=$('draw'), dctx=dcv.getContext('2d');
-let strokes=[], cur=null, drawing=false, padW=0, padH=0;
 function sizePad(){
   padW=Math.min(W*0.9, 520); padH=Math.min(H*0.42, 360);
   const dpr=Math.min(2,window.devicePixelRatio||1);
@@ -1515,7 +1534,7 @@ function redrawStrokes(){
     dctx.stroke();}
   dctx.shadowBlur=0;
 }
-addDrag(dcv,
+addDragForPad(dcv,
   p=>{ drawing=true; cur=[p]; strokes.push(cur); redrawStrokes(); sfxDraw(); },
   p=>{ if(!drawing)return; cur.push(p); redrawStrokes(); },
   ()=>{ drawing=false; }
