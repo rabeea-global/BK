@@ -156,32 +156,34 @@
 "use strict";
 
 /* ============================================================================
-   إعدادات الحفظ و التوكنز
+   إعدادات الحفظ و التوكنز المقاومة للأخطاء
    ========================================================================== */
 let BEST = 0;
-async function loadBest(){
-  try{ const r = await window.storage.get('dyw:best'); if(r&&r.value) BEST = parseInt(r.value)||0; }
-  catch(e){ try{ BEST = parseInt(localStorage.getItem('dyw:best'))||0; }catch(_){} }
+function loadBest(){
+  try{ BEST = parseInt(localStorage.getItem('dyw:best'))||0; }catch(_){}
   setText('bestStart', BEST);
 }
-async function saveBest(v){
+function saveBest(v){
   BEST = v;
-  try{ await window.storage.set('dyw:best', String(v)); }
-  catch(e){ try{ localStorage.setItem('dyw:best', String(v)); }catch(_){} }
+  try{ localStorage.setItem('dyw:best', String(v)); }catch(_){}
 }
 
 let playSeconds=0, bkTokens=0, saveCD=0;
-async function loadProgress(){
-  try{ const a=await window.storage.get('dyw:secs'); if(a&&a.value) playSeconds=parseFloat(a.value)||0;
-       const b=await window.storage.get('dyw:bk');   if(b&&b.value) bkTokens=parseInt(b.value)||0; }
-  catch(e){ try{ playSeconds=parseFloat(localStorage.getItem('dyw:secs'))||0; bkTokens=parseInt(localStorage.getItem('dyw:bk'))||0; }catch(_){} }
+function loadProgress(){
+  try{ 
+    playSeconds=parseFloat(localStorage.getItem('dyw:secs'))||0; 
+    bkTokens=parseInt(localStorage.getItem('dyw:bk'))||0; 
+  }catch(_){}
   bkTokens=Math.floor(playSeconds/360);
   updateBK();
 }
-async function saveProgress(){
-  try{ await window.storage.set('dyw:secs',String(Math.round(playSeconds))); await window.storage.set('dyw:bk',String(bkTokens)); }
-  catch(e){ try{ localStorage.setItem('dyw:secs',String(Math.round(playSeconds))); localStorage.setItem('dyw:bk',String(bkTokens)); }catch(_){} }
+function saveProgress(){
+  try{ 
+    localStorage.setItem('dyw:secs',String(Math.round(playSeconds))); 
+    localStorage.setItem('dyw:bk',String(bkTokens)); 
+  }catch(_){}
 }
+
 function updateBK(){ setText('bkChip','BK '+bkTokens); setText('bkStart','BK: '+bkTokens); }
 function nukesUnlocked(){ return (playSeconds/3600) >= 1000; }
 function tickPlaytime(dt){
@@ -200,41 +202,44 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const dist=(x1,y1,x2,y2)=>Math.hypot(x1-x2,y1-y2);
 
 /* ============================================================================
-   نظام مفاجآت الأكل العراقي (صوت + صورة حقيقية) مع حماية ضد الكراش
+   نظام مفاجآت الأكل العراقي (آمن ضد كراش الصور والصوت)
    ========================================================================== */
-const audioGood = new Audio('shmakil.mp3');
-const audioBad = new Audio('jo3an.mp3');
+let audioGood = null, audioBad = null;
+try {
+  audioGood = new Audio('shmakil.mp3');
+  audioBad = new Audio('jo3an.mp3');
+} catch(e) {}
 
-// 25 أكلة عراقية مقسمة
+// روابط محلية للصور لكي تتجنب الحظر من المتصفح
 const DISHES = [
-  {n: 'تشريب لحم',     url: 'https://placehold.co/300x300/8a4b1e/ffffff?text=تشريب+لحم'},
-  {n: 'تشريب باقلاء',  url: 'https://placehold.co/300x300/5f7d3a/ffffff?text=تشريب+باقلاء'},
-  {n: 'قوزي على تمن',   url: 'https://placehold.co/300x300/a35a24/ffffff?text=قوزي'},
-  {n: 'دولمة',         url: 'https://placehold.co/300x300/4c662e/ffffff?text=دولمة'},
-  {n: 'سمك مسكوف',     url: 'https://placehold.co/300x300/b5651d/ffffff?text=مسكوف'},
-  {n: 'كباب عراقي',    url: 'https://placehold.co/300x300/7a3520/ffffff?text=كباب'},
-  {n: 'برياني',        url: 'https://placehold.co/300x300/e0902c/ffffff?text=برياني'},
-  {n: 'تبسي باذنجان',  url: 'https://placehold.co/300x300/a83218/ffffff?text=تبسي'},
-  {n: 'باجة',          url: 'https://placehold.co/300x300/c98a3c/ffffff?text=باجة'},
-  {n: 'قيمة وتمن',     url: 'https://placehold.co/300x300/8b1c1c/ffffff?text=قيمة'},
-  {n: 'دجاج مشوي',     url: 'https://placehold.co/300x300/d97725/ffffff?text=دجاج+مشوي'},
-  {n: 'تكة لحم',       url: 'https://placehold.co/300x300/632615/ffffff?text=تكة'},
-  {n: 'معلاق مشوي',    url: 'https://placehold.co/300x300/4a1c11/ffffff?text=معلاق'},
-  {n: 'كاهي وقيمر',    url: 'https://placehold.co/300x300/f5e8c9/222222?text=كاهي+وقيمر'},
-  {n: 'مخلمة',         url: 'https://placehold.co/300x300/d6b145/222222?text=مخلمة'},
+  {n: 'تشريب لحم',     url: 'img/tashreeb_laham.jpg'},
+  {n: 'تشريب باقلاء',  url: 'img/tashreeb_baqla.jpg'},
+  {n: 'قوزي على تمن',   url: 'img/quzi.jpg'},
+  {n: 'دولمة',         url: 'img/dolma.jpg'},
+  {n: 'سمك مسكوف',     url: 'img/masgouf.jpg'},
+  {n: 'كباب عراقي',    url: 'img/kebab.jpg'},
+  {n: 'برياني',        url: 'img/biryani.jpg'},
+  {n: 'تبسي باذنجان',  url: 'img/tebsi.jpg'},
+  {n: 'باجة',          url: 'img/pacha.jpg'},
+  {n: 'قيمة وتمن',     url: 'img/qeema.jpg'},
+  {n: 'دجاج مشوي',     url: 'img/djaj_mashwi.jpg'},
+  {n: 'تكة لحم',       url: 'img/tikka.jpg'},
+  {n: 'معلاق مشوي',    url: 'img/maalaq.jpg'},
+  {n: 'كاهي وقيمر',    url: 'img/kahi.jpg'},
+  {n: 'مخلمة',         url: 'img/makhlama.jpg'},
 ];
 
 const FASTFOOD = [
-  {n: 'فاصوليا يابسة', url: 'https://placehold.co/300x300/ba4118/ffffff?text=فاصوليا'},
-  {n: 'بامية',         url: 'https://placehold.co/300x300/872410/ffffff?text=بامية'},
-  {n: 'كبة موصل',      url: 'https://placehold.co/300x300/b9752e/ffffff?text=كبة+موصل'},
-  {n: 'كبة حلب',       url: 'https://placehold.co/300x300/e3b644/222222?text=كبة+حلب'},
-  {n: 'كبة حامض',      url: 'https://placehold.co/300x300/d15e19/ffffff?text=كبة+حامض'},
-  {n: 'شاورما لحم',    url: 'https://placehold.co/300x300/a3502a/ffffff?text=شاورما'},
-  {n: 'صمون حار',      url: 'https://placehold.co/300x300/d19c49/ffffff?text=صمون+حار'},
-  {n: 'زردة',          url: 'https://placehold.co/300x300/e8d451/222222?text=زردة'},
-  {n: 'محلبي',         url: 'https://placehold.co/300x300/fcfcfc/222222?text=محلبي'},
-  {n: 'حلاوة طحينية',  url: 'https://placehold.co/300x300/d4ba8c/222222?text=حلاوة'},
+  {n: 'فاصوليا يابسة', url: 'img/fasoolia.jpg'},
+  {n: 'بامية',         url: 'img/bamia.jpg'},
+  {n: 'كبة موصل',      url: 'img/kubba_mosul.jpg'},
+  {n: 'كبة حلب',       url: 'img/kubba_halab.jpg'},
+  {n: 'كبة حامض',      url: 'img/kubba_hamidh.jpg'},
+  {n: 'شاورما لحم',    url: 'img/shawarma.jpg'},
+  {n: 'صمون حار',      url: 'img/sammoon.jpg'},
+  {n: 'زردة',          url: 'img/zarda.jpg'},
+  {n: 'محلبي',         url: 'img/mahalabi.jpg'},
+  {n: 'حلاوة طحينية',  url: 'img/halawa.jpg'},
 ];
 
 const imageCache = {};
@@ -262,17 +267,15 @@ function triggerSurprise(mode){
   surprise = {mode, dish, t:0, life:3.0};
   surpriseCD = 9;
   
-  // نظام حماية الصوت من إيقاف اللعبة (Anti-Crash Audio Logic)
   try {
     if (mode === 'good') {
-      if (audioGood.readyState >= 1) audioGood.currentTime = 0;
-      audioGood.play().catch(() => scaryVoice('شماكل إنت'));
+      if (audioGood && audioGood.readyState >= 1) audioGood.currentTime = 0;
+      if (audioGood) audioGood.play().catch(() => scaryVoice('شماكل إنت'));
     } else {
-      if (audioBad.readyState >= 1) audioBad.currentTime = 0;
-      audioBad.play().catch(() => scaryVoice('شبيك جوعان'));
+      if (audioBad && audioBad.readyState >= 1) audioBad.currentTime = 0;
+      if (audioBad) audioBad.play().catch(() => scaryVoice('شبيك جوعان'));
     }
   } catch(e) {
-    // في حال وجود أي عطل أو نقص في الملفات، اعمل بالصوت الآلي دون إيقاف اللعبة
     scaryVoice(mode === 'good' ? 'شماكل إنت' : 'شبيك جوعان');
   }
 }
@@ -1020,47 +1023,52 @@ function killEnemy(j){
    HIGH QUALITY VECTOR SHIPS & RENDERING
    ========================================================================== */
 function render(){
-  ctx.clearRect(0,0,W,H);
-  drawBackground();
-  for(const m of meteors) drawMeteor(m);
-  drawPlayer();
-  for(const e of enemies) drawEnemy(e);
-  for(const b of bonuses) drawBonus(b);
-  for(const s of shots) drawShot(s);
-  for(const b of enemyShots) drawEnemyShot(b);
-  for(const f of fx) drawFXItem(f);
-  
-  if(boss && boss.hp>0){
-    const bw=W*0.7, bx=(W-bw)/2, by=64;
-    ctx.save();ctx.fillStyle='rgba(10,8,20,.8)';roundRect(ctx,bx-4,by-4,bw+8,20,6);ctx.fill();
-    ctx.fillStyle='#3a1020';roundRect(ctx,bx,by,bw,12,4);ctx.fill();
-    const wkHue={star:120,rocket:8,bomb:18,laser:320}[boss.weak]||0;
-    ctx.fillStyle=`hsl(${wkHue},85%,55%)`;roundRect(ctx,bx,by,bw*clamp(boss.hp/boss.maxhp,0,1),12,4);ctx.fill();
-    ctx.fillStyle='#fff';ctx.font='800 14px system-ui';ctx.textAlign='center';ctx.textBaseline='alphabetic';
-    ctx.fillText('☠ '+boss.name+' — نقطة ضعفه: '+famLabel(boss.weak), W/2, by-8);
-    ctx.restore();
-  }
+  try {
+    ctx.clearRect(0,0,W,H);
+    drawBackground();
+    for(const m of meteors) drawMeteor(m);
+    drawPlayer();
+    for(const e of enemies) drawEnemy(e);
+    for(const b of bonuses) drawBonus(b);
+    for(const s of shots) drawShot(s);
+    for(const b of enemyShots) drawEnemyShot(b);
+    for(const f of fx) drawFXItem(f);
+    
+    if(boss && boss.hp>0){
+      const bw=W*0.7, bx=(W-bw)/2, by=64;
+      ctx.save();ctx.fillStyle='rgba(10,8,20,.8)';roundRect(ctx,bx-4,by-4,bw+8,20,6);ctx.fill();
+      ctx.fillStyle='#3a1020';roundRect(ctx,bx,by,bw,12,4);ctx.fill();
+      const wkHue={star:120,rocket:8,bomb:18,laser:320}[boss.weak]||0;
+      ctx.fillStyle=`hsl(${wkHue},85%,55%)`;roundRect(ctx,bx,by,bw*clamp(boss.hp/boss.maxhp,0,1),12,4);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='800 14px system-ui';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      ctx.fillText('☠ '+boss.name+' — نقطة ضعفه: '+famLabel(boss.weak), W/2, by-8);
+      ctx.restore();
+    }
 
-  if(banner){
-    const a=clamp(banner.t/0.6,0,1);
-    ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
-    ctx.fillStyle='#fff';ctx.font='900 34px system-ui';ctx.fillText(banner.text, W/2, H*0.34);
-    if(banner.sub){ctx.fillStyle='#8fd0ff';ctx.font='700 18px system-ui';ctx.fillText(banner.sub, W/2, H*0.34+30);}
-    ctx.restore();
+    if(banner){
+      const a=clamp(banner.t/0.6,0,1);
+      ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
+      ctx.fillStyle='#fff';ctx.font='900 34px system-ui';ctx.fillText(banner.text, W/2, H*0.34);
+      if(banner.sub){ctx.fillStyle='#8fd0ff';ctx.font='700 18px system-ui';ctx.fillText(banner.sub, W/2, H*0.34+30);}
+      ctx.restore();
+    }
+    if(playHintT>0){
+      const a=clamp(playHintT/1.2,0,1);
+      ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
+      ctx.fillStyle='#eaf2ff';ctx.font='800 20px system-ui';
+      ctx.fillText('اسحب لتحريك السفينة 🚀 وتفادَ النيران', W/2, H*0.46);
+      ctx.font='600 15px system-ui';ctx.fillStyle='#9fc6ff';
+      ctx.fillText('السلاح يطلق للأمام — صُفّ سفينتك أمام العدو', W/2, H*0.46+26);
+      ctx.restore();
+    }
+    drawSurprise();
+  } catch(err) {
+    // منع توقف اللعبة في حال وجود أخطاء في الرسم
+    console.error("Render Error:", err);
   }
-  if(playHintT>0){
-    const a=clamp(playHintT/1.2,0,1);
-    ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
-    ctx.fillStyle='#eaf2ff';ctx.font='800 20px system-ui';
-    ctx.fillText('اسحب لتحريك السفينة 🚀 وتفادَ النيران', W/2, H*0.46);
-    ctx.font='600 15px system-ui';ctx.fillStyle='#9fc6ff';
-    ctx.fillText('السلاح يطلق للأمام — صُفّ سفينتك أمام العدو', W/2, H*0.46+26);
-    ctx.restore();
-  }
-  drawSurprise();
 }
 
-// رسم المفاجآت (نظام عرض الصور الحقيقية بشكل دائري)
+// رسم المفاجآت (نظام عرض الصور الحقيقية بشكل دائري وآمن تماماً)
 function drawSurprise(){
   const s = surprise; 
   if(!s) return;
@@ -1095,8 +1103,8 @@ function drawSurprise(){
   const sc = 0.5+bb*0.75;
   const img = imageCache[s.dish.n];
 
-  // رسم الصورة كطبق احترافي
-  if (img && img.complete) {
+  // رسم الصورة فقط إذا كانت مكتملة التنزيل ولم تفشل (الحماية من الكراش هنا)
+  if (img && img.complete && img.naturalWidth > 0) {
     ctx.save();
     ctx.globalAlpha = a * 0.96;
     ctx.scale(sc, sc);
@@ -1110,22 +1118,22 @@ function drawSurprise(){
     // رسم الصورة وتوسيطها (الحجم 130x130)
     ctx.drawImage(img, -65, -65, 130, 130);
     ctx.restore();
-
-    // رسم إطار حول الطبق
-    ctx.save();
-    ctx.globalAlpha = a * 0.96;
-    ctx.scale(sc, sc);
-    ctx.beginPath();
-    ctx.arc(0, 0, 65, 0, Math.PI * 2);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = good ? '#ffd23b' : '#ff6060';
-    ctx.stroke();
-    // إضاءة داخلية للإطار
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#ffffff';
-    ctx.stroke();
-    ctx.restore();
   }
+
+  // رسم إطار حول الطبق دائماً (حتى لو لم تكن هناك صورة)
+  ctx.save();
+  ctx.globalAlpha = a * 0.96;
+  ctx.scale(sc, sc);
+  ctx.beginPath();
+  ctx.arc(0, 0, 65, 0, Math.PI * 2);
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = good ? '#ffd23b' : '#ff6060';
+  ctx.stroke();
+  // إضاءة داخلية للإطار
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  ctx.restore();
   
   // رسم الكلمات العراقية واسم الأكلة
   ctx.textAlign='center'; ctx.lineJoin='round';
