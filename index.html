@@ -200,13 +200,12 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const dist=(x1,y1,x2,y2)=>Math.hypot(x1-x2,y1-y2);
 
 /* ============================================================================
-   نظام مفاجآت الأكل العراقي (صوت + صورة حقيقية)
+   نظام مفاجآت الأكل العراقي (صوت + صورة حقيقية) مع حماية ضد الكراش
    ========================================================================== */
-// ملفات الصوت الخاصة بك (يجب أن تضعها في مجلد اللعبة بنفس الاسم)
 const audioGood = new Audio('shmakil.mp3');
 const audioBad = new Audio('jo3an.mp3');
 
-// 25 أكلة عراقية مقسمة على الحالات (يمكنك تغيير الروابط لصورك المحلية مثل img/dolma.jpg)
+// 25 أكلة عراقية مقسمة
 const DISHES = [
   {n: 'تشريب لحم',     url: 'https://placehold.co/300x300/8a4b1e/ffffff?text=تشريب+لحم'},
   {n: 'تشريب باقلاء',  url: 'https://placehold.co/300x300/5f7d3a/ffffff?text=تشريب+باقلاء'},
@@ -238,7 +237,6 @@ const FASTFOOD = [
   {n: 'حلاوة طحينية',  url: 'https://placehold.co/300x300/d4ba8c/222222?text=حلاوة'},
 ];
 
-// نظام تحميل الصور مسبقاً في الذاكرة لضمان عدم حدوث تقطيع
 const imageCache = {};
 function preloadFoodImages() {
   [...DISHES, ...FASTFOOD].forEach(item => {
@@ -264,13 +262,18 @@ function triggerSurprise(mode){
   surprise = {mode, dish, t:0, life:3.0};
   surpriseCD = 9;
   
-  // تشغيل ملف الصوت الخاص بك، وإن فشل التشغيل يقوم بالرجوع للذكاء الاصطناعي (TTS)
-  if (mode === 'good') {
-    audioGood.currentTime = 0;
-    audioGood.play().catch(() => scaryVoice('شماكل إنت'));
-  } else {
-    audioBad.currentTime = 0;
-    audioBad.play().catch(() => scaryVoice('شبيك جوعان'));
+  // نظام حماية الصوت من إيقاف اللعبة (Anti-Crash Audio Logic)
+  try {
+    if (mode === 'good') {
+      if (audioGood.readyState >= 1) audioGood.currentTime = 0;
+      audioGood.play().catch(() => scaryVoice('شماكل إنت'));
+    } else {
+      if (audioBad.readyState >= 1) audioBad.currentTime = 0;
+      audioBad.play().catch(() => scaryVoice('شبيك جوعان'));
+    }
+  } catch(e) {
+    // في حال وجود أي عطل أو نقص في الملفات، اعمل بالصوت الآلي دون إيقاف اللعبة
+    scaryVoice(mode === 'good' ? 'شماكل إنت' : 'شبيك جوعان');
   }
 }
 
@@ -1711,4 +1714,4 @@ loadBest(); loadProgress();
 window.addEventListener('resize',()=>{ if(state==='draw')sizePad(); });
 </script>
 </body>
-</html> 
+</html>
